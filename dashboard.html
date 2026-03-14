@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>IDX Quant Screener</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:       #070a0f;
+  --surface:  #0d1117;
+  --border:   #1a2332;
+  --border2:  #243044;
+  --text:     #c8d8f0;
+  --muted:    #4a6080;
+  --accent:   #00d4ff;
+  --green:    #00ff88;
+  --red:      #ff4466;
+  --yellow:   #ffd600;
+  --purple:   #b388ff;
+  --orange:   #ff9f43;
+  --mono:     'Space Mono', monospace;
+  --sans:     'Syne', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Scanline overlay ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.012) 2px, rgba(0,212,255,0.012) 4px);
+  pointer-events: none; z-index: 9999;
+}
+
+/* ── Header ── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, rgba(0,212,255,0.04), transparent);
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(12px);
+}
+.logo {
+  font-family: var(--sans);
+  font-size: 18px; font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--accent);
+}
+.logo span { color: var(--text); }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+/* ── Layout ── */
+.layout { display: flex; min-height: calc(100vh - 61px); }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px; min-height: 100%;
+  border-right: 1px solid var(--border);
+  padding: 24px 0;
+  flex-shrink: 0;
+  position: sticky; top: 61px; height: calc(100vh - 61px);
+  overflow-y: auto;
+}
+.sidebar-label {
+  font-size: 10px; letter-spacing: 2px;
+  color: var(--muted); padding: 0 20px 12px;
+  text-transform: uppercase;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 20px;
+  cursor: pointer; border: none; background: none;
+  color: var(--muted); font-family: var(--mono); font-size: 12px;
+  width: 100%; text-align: left;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+.nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(0,212,255,0.06); }
+.nav-num { font-size: 10px; color: var(--muted); min-width: 16px; }
+
+/* ── Main ── */
+.main { flex: 1; padding: 28px 32px; overflow-x: hidden; }
+
+/* ── Section ── */
+.section { display: none; animation: fadeIn 0.2s ease; }
+.section.active { display: block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:none;} }
+
+.section-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 24px; gap: 16px; flex-wrap: wrap;
+}
+.section-title {
+  font-family: var(--sans);
+  font-size: 22px; font-weight: 800;
+  color: white; letter-spacing: -0.5px;
+}
+.section-subtitle { color: var(--muted); margin-top: 4px; font-size: 11px; }
+.tag {
+  display: inline-block; padding: 3px 10px;
+  border-radius: 3px; font-size: 10px; letter-spacing: 1px;
+  background: rgba(0,212,255,0.1); color: var(--accent);
+  border: 1px solid rgba(0,212,255,0.2);
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px; padding: 20px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 14px;
+}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+
+/* ── Controls ── */
+.controls {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 16px 20px;
+  display: flex; flex-wrap: wrap; gap: 12px;
+  align-items: flex-end; margin-bottom: 20px;
+}
+.ctrl-group { display: flex; flex-direction: column; gap: 5px; }
+.ctrl-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+input, select {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  color: var(--text); font-family: var(--mono); font-size: 12px;
+  padding: 7px 10px; border-radius: 3px; outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus { border-color: var(--accent); }
+input[type="text"] { width: 110px; }
+input[type="number"] { width: 80px; }
+.btn {
+  background: var(--accent); color: var(--bg);
+  border: none; font-family: var(--mono); font-size: 12px; font-weight: 700;
+  padding: 8px 20px; border-radius: 3px; cursor: pointer;
+  transition: all 0.15s; letter-spacing: 0.5px;
+  align-self: flex-end;
+}
+.btn:hover { background: white; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-sm {
+  background: transparent; color: var(--accent);
+  border: 1px solid var(--border2); font-family: var(--mono);
+  font-size: 11px; padding: 5px 12px; border-radius: 3px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-sm:hover { border-color: var(--accent); }
+
+/* ── Stat boxes ── */
+.stat-box {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 3px; padding: 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.stat-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+.stat-val { font-size: 20px; font-weight: 700; font-family: var(--sans); }
+.stat-val.green  { color: var(--green); }
+.stat-val.red    { color: var(--red); }
+.stat-val.accent { color: var(--accent); }
+.stat-val.yellow { color: var(--yellow); }
+.stat-val.white  { color: white; }
+
+/* ── Signal box ── */
+.signal-box {
+  border-radius: 4px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--sans); font-size: 15px; font-weight: 700;
+  margin-bottom: 16px;
+}
+.signal-box.bullish { background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); color: var(--green); }
+.signal-box.bearish { background: rgba(255,68,102,0.08); border: 1px solid rgba(255,68,102,0.3); color: var(--red); }
+.signal-box.neutral { background: rgba(74,96,128,0.15); border: 1px solid var(--border); color: var(--muted); }
+
+/* ── Table ── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  text-align: left; padding: 8px 12px;
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted); border-bottom: 1px solid var(--border);
+}
+td { padding: 9px 12px; border-bottom: 1px solid rgba(26,35,50,0.6); }
+tr:hover td { background: rgba(255,255,255,0.02); }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 2px; font-size: 10px; letter-spacing: 0.5px;
+}
+.badge.win  { background: rgba(0,255,136,0.12); color: var(--green); }
+.badge.loss { background: rgba(255,68,102,0.12); color: var(--red); }
+.badge.time { background: rgba(0,212,255,0.1);  color: var(--accent); }
+.badge.stop { background: rgba(255,159,67,0.12); color: var(--orange); }
+.badge.signal { background: rgba(0,255,136,0.15); color: var(--green); border: 1px solid rgba(0,255,136,0.3); }
+.badge.nosig  { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+
+/* ── Mini chart ── */
+.mini-chart { height: 60px; position: relative; overflow: hidden; }
+.mini-chart svg { width: 100%; height: 100%; }
+
+/* ── Ranking row ── */
+.rank-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid rgba(26,35,50,0.6);
+}
+.rank-num { width: 22px; color: var(--muted); font-size: 11px; flex-shrink: 0; }
+.rank-bar-wrap { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.rank-bar { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+.rank-ticker { min-width: 70px; font-weight: 700; }
+.rank-score  { min-width: 70px; text-align: right; font-size: 11px; }
+.selected-badge { background: rgba(0,255,136,0.15); color: var(--green); border: 1px solid rgba(0,255,136,0.3); padding: 2px 8px; border-radius: 2px; font-size: 10px; }
+
+/* ── Corr matrix ── */
+.corr-cell {
+  width: 46px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; border-radius: 2px; cursor: default;
+}
+
+/* ── Loading ── */
+.loading {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--muted); padding: 24px 0; font-size: 12px;
+}
+.spinner {
+  width: 16px; height: 16px; border: 2px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── DOW bar ── */
+.dow-bar-wrap { display: flex; flex-direction: column; gap: 6px; }
+.dow-row { display: flex; align-items: center; gap: 8px; }
+.dow-day { width: 28px; color: var(--muted); font-size: 11px; }
+.dow-bar-bg { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; position: relative; }
+.dow-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s; }
+.dow-val { min-width: 55px; text-align: right; font-size: 11px; }
+
+/* ── Z bar ── */
+.z-gauge { height: 32px; position: relative; border-radius: 3px; background: var(--bg); overflow: hidden; border: 1px solid var(--border); }
+.z-track { position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border); transform: translateY(-50%); }
+.z-pointer {
+  position: absolute; top: 50%; width: 12px; height: 12px;
+  background: var(--accent); border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px var(--accent);
+  transition: left 0.5s ease;
+}
+.z-label-n2 { position: absolute; left: 20%; top: 4px; font-size: 9px; color: var(--muted); }
+.z-label-0  { position: absolute; left: 50%; top: 4px; font-size: 9px; color: var(--muted); transform: translateX(-50%); }
+.z-label-p2 { position: absolute; right: 18%; top: 4px; font-size: 9px; color: var(--muted); }
+
+/* ── Equity sparkline ── */
+.equity-spark { height: 48px; }
+
+/* ── Overview page ── */
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 14px; }
+.overview-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 18px; cursor: pointer;
+  transition: all 0.2s; position: relative; overflow: hidden;
+}
+.overview-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--card-color, var(--accent));
+}
+.overview-card:hover {
+  border-color: var(--card-color, var(--accent));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.ov-num { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.ov-name { font-family: var(--sans); font-size: 16px; font-weight: 700; color: white; margin-bottom: 4px; }
+.ov-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.ov-tags { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.ov-tag { font-size: 10px; padding: 2px 8px; border-radius: 2px; background: rgba(255,255,255,0.05); color: var(--muted); }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .grid-4 { grid-template-columns: repeat(2,1fr); }
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">IDX<span>QUANT</span></div>
+  <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)">
+    <div class="status-dot"></div> LIVE SCREENER
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-label">Navigation</div>
+    <button class="nav-item active" onclick="showSection('overview')">
+      <span class="nav-num">00</span> Overview
+    </button>
+    <button class="nav-item" onclick="showSection('vcb')">
+      <span class="nav-num">01</span> Volatility Compression
+    </button>
+    <button class="nav-item" onclick="showSection('zscore')">
+      <span class="nav-num">02</span> Z-Score Reversion
+    </button>
+    <button class="nav-item" onclick="showSection('overnight')">
+      <span class="nav-num">03</span> Overnight Drift
+    </button>
+    <button class="nav-item" onclick="showSection('ped')">
+      <span class="nav-num">04</span> Post-Earnings Drift
+    </button>
+    <button class="nav-item" onclick="showSection('gap')">
+      <span class="nav-num">05</span> Gap Continuation
+    </button>
+    <button class="nav-item" onclick="showSection('rsi')">
+      <span class="nav-num">06</span> RSI Rotation
+    </button>
+    <button class="nav-item" onclick="showSection('pairs')">
+      <span class="nav-num">07</span> Pairs Trading
+    </button>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ══════════════════ OVERVIEW ══════════════════ -->
+    <div class="section active" id="section-overview">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Strategy Overview</div>
+          <div class="section-subtitle">7 quantitative strategies — click any card to open screener</div>
+        </div>
+      </div>
+      <div class="overview-grid">
+        <div class="overview-card" style="--card-color:#00d4ff" onclick="showSection('vcb')">
+          <div class="ov-num">01</div>
+          <div class="ov-name">Volatility Compression</div>
+          <div class="ov-desc">Enter breakouts after unusually tight range periods. Compressed markets release into outsized moves.</div>
+          <div class="ov-tags"><span class="ov-tag">SINGLE STOCK</span><span class="ov-tag">SWING</span><span class="ov-tag">BREAKOUT</span></div>
+        </div>
+        <div class="overview-card" style="--card-color:#b388ff" onclick="showSection('zscore')">
+          <div class="ov-num">02</div>
+          <div class="ov-name">Z-Score Reversion</div>
+          <div class="ov-desc">Trade statistical extremes between two correlated stocks. Enter when spread hits ±2σ, exit at mean.</div>
+          <div class="ov-tags"><span class="ov-tag">PAIRS</span><span class="ov-tag">MEAN REVERSION</span><span class="ov-tag">MARKET NEUTRAL</span></div>
+        </div>
+        <div class="overview-card" style="--card-color:#00ff88" onclick="showSection('overnight')">
+          <div class="ov-num">03</div>
+          <div class="ov-name">Overnight Drift</div>
+          <div class="ov-desc">Most IDX equity returns occur close-to-open. Institutions position after hours — follow the drift.</div>
+          <div class="ov-tags"><span class="ov-tag">OVERNIGHT</span><span class="ov-tag">DAILY</span><span class="ov-tag">INSTITUTIONAL</span></div>
+        </div>
+        <div class="overview-card" style="--card-color:#ffd600" onclick="showSection('ped')">
+          <div class="ov-num">04</div>
+          <div class="ov-name">Post-Earnings Drift</div>
+          <div class="ov-desc">Stocks gap on surprise news then keep drifting in the same direction for 10–40 days. Ride the wave.</div>
+          <div class="ov-tags"><span class="ov-tag">EVENT DRIVEN</span><span class="ov-tag">MOMENTUM</span><span class="ov-tag">20-DAY HOLD</span></div>
+        </div>
+        <div class="overview-card" style="--card-color:#ff9f43" onclick="showSection('gap')">
+          <div class="ov-num">05</div>
+          <div class="ov-name">Gap Continuation</div>
+          <div class="ov-desc">Large open gaps with high volume reflect real institutional positioning — tend to trend all day.</div>
+          <div class="ov-tags"><span class="ov-tag">INTRADAY</span><span class="ov-tag">GAP</span><span class="ov-tag">VOLUME</span></div>
+        </div>
+        <div class="overview-card" style="--card-color:#ff6b9d" onclick="showSection('rsi')">
+          <div class="ov-num">06</div>
+          <div class="ov-name">RSI Rotation</div>
+          <div class="ov-desc">Rank universe by 3-month momentum monthly. Top 30% outperform — rotate and let leaders run.</div>
+          <div class="ov-tags"><span class="ov-tag">PORTFOLIO</span><span class="ov-tag">MONTHLY</span><span class="ov-tag">MOMENTUM</span></div>
+        </div>
+        <div class="overview-card" style="--card-color:#55efc4" onclick="showSection('pairs')">
+          <div class="ov-num">07</div>
+          <div class="ov-name">Pairs Trading</div>
+          <div class="ov-desc">Scan all pair combinations for divergence. Buy the underpriced stock when z-score hits extremes.</div>
+          <div class="ov-tags"><span class="ov-tag">PAIRS</span><span class="ov-tag">LONG ONLY</span><span class="ov-tag">AUTO RANK</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ 01 VCB ══════════════════ -->
+    <div class="section" id="section-vcb">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Volatility Compression Breakout</div>
+          <div class="section-subtitle">Enter after tight range periods — compressed markets release into big moves</div>
+        </div>
+        <span class="tag">SWING · BREAKOUT</span>
+      </div>
+      <div class="controls">
+        <div class="ctrl-group"><div class="ctrl-label">Ticker</div><input type="text" id="vcb-ticker" value="ANTM" placeholder="e.g. ANTM"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Lookback Days</div><input type="number" id="vcb-lookback" value="20"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Percentile %</div><input type="number" id="vcb-percentile" value="25"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Hold Days</div><input type="number" id="vcb-hold" value="10"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Stop Loss %</div><input type="number" id="vcb-stop" value="3"/></div>
+        <button class="btn" onclick="runVCB()">RUN SCREEN</button>
+      </div>
+      <div id="vcb-result"></div>
+    </div>
+
+    <!-- ══════════════════ 02 ZSCORE ══════════════════ -->
+    <div class="section" id="section-zscore">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Z-Score Reversion</div>
+          <div class="section-subtitle">Statistical mean reversion between two correlated stocks</div>
+        </div>
+        <span class="tag">PAIRS · MEAN REVERSION</span>
+      </div>
+      <div class="controls">
+        <div class="ctrl-group"><div class="ctrl-label">Stock A</div><input type="text" id="zs-tickerA" value="ANTM"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Stock B</div><input type="text" id="zs-tickerB" value="INCO"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Roll Window</div><input type="number" id="zs-window" value="60"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Z Entry</div><input type="number" id="zs-entry" value="2.0" step="0.1"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Z Exit</div><input type="number" id="zs-exit" value="0.5" step="0.1"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Min Corr</div><input type="number" id="zs-corr" value="0.7" step="0.05"/></div>
+        <button class="btn" onclick="runZScore()">RUN SCREEN</button>
+      </div>
+      <div id="zscore-result"></div>
+    </div>
+
+    <!-- ══════════════════ 03 OVERNIGHT ══════════════════ -->
+    <div class="section" id="section-overnight">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Overnight Drift</div>
+          <div class="section-subtitle">Most IDX returns happen close-to-open — track institutional overnight positioning</div>
+        </div>
+        <span class="tag">OVERNIGHT · DAILY</span>
+      </div>
+      <div class="controls">
+        <div class="ctrl-group"><div class="ctrl-label">Ticker</div><input type="text" id="on-ticker" value="ANTM"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">MA Period</div><input type="number" id="on-ma" value="20"/></div>
+        <button class="btn" onclick="runOvernight()">RUN SCREEN</button>
+      </div>
+      <div id="overnight-result"></div>
+    </div>
+
+    <!-- ══════════════════ 04 PED ══════════════════ -->
+    <div class="section" id="section-ped">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Post-Earnings Drift</div>
+          <div class="section-subtitle">Ride the continuation after big gap-up events with volume confirmation</div>
+        </div>
+        <span class="tag">EVENT DRIVEN · 20-DAY</span>
+      </div>
+      <div class="controls">
+        <div class="ctrl-group"><div class="ctrl-label">Ticker</div><input type="text" id="ped-ticker" value="ANTM"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Gap Threshold %</div><input type="number" id="ped-gap" value="5"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Hold Days</div><input type="number" id="ped-hold" value="20"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Stop Loss %</div><input type="number" id="ped-stop" value="7"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Vol Ratio Min</div><input type="number" id="ped-vol" value="1.5" step="0.1"/></div>
+        <button class="btn" onclick="runPED()">RUN SCREEN</button>
+      </div>
+      <div id="ped-result"></div>
+    </div>
+
+    <!-- ══════════════════ 05 GAP ══════════════════ -->
+    <div class="section" id="section-gap">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Intraday Gap Continuation</div>
+          <div class="section-subtitle">Large gaps + high volume = real institutional flow, not noise</div>
+        </div>
+        <span class="tag">INTRADAY · GAP</span>
+      </div>
+      <div class="controls">
+        <div class="ctrl-group"><div class="ctrl-label">Ticker</div><input type="text" id="gap-ticker" value="ANTM"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Min Gap %</div><input type="number" id="gap-min" value="1.5" step="0.5"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Vol Multiplier</div><input type="number" id="gap-vol" value="1.5" step="0.1"/></div>
+        <button class="btn" onclick="runGap()">RUN SCREEN</button>
+      </div>
+      <div id="gap-result"></div>
+    </div>
+
+    <!-- ══════════════════ 06 RSI ROTATION ══════════════════ -->
+    <div class="section" id="section-rsi">
+      <div class="section-header">
+        <div>
+          <div class="section-title">RSI Rotation</div>
+          <div class="section-subtitle">Monthly rebalancing into top momentum stocks — rotate into leaders</div>
+        </div>
+        <span class="tag">PORTFOLIO · MONTHLY</span>
+      </div>
+      <div class="controls">
+        <div class="ctrl-group" style="flex:1;min-width:200px">
+          <div class="ctrl-label">Tickers (comma separated)</div>
+          <input type="text" id="rsi-tickers" value="ANTM,INCO,NCKL,ADRO,PTBA,ITMG,MDKA,TINS" style="width:100%;max-width:400px"/>
+        </div>
+        <div class="ctrl-group"><div class="ctrl-label">Mom Window</div><input type="number" id="rsi-mom" value="63"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Top %</div><input type="number" id="rsi-top" value="30"/></div>
+        <button class="btn" onclick="runRSI()">RUN SCREEN</button>
+      </div>
+      <div id="rsi-result"></div>
+    </div>
+
+    <!-- ══════════════════ 07 PAIRS ══════════════════ -->
+    <div class="section" id="section-pairs">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Pairs Trading Divergence</div>
+          <div class="section-subtitle">Auto-scan all pair combinations — buy the underpriced stock when z hits extreme</div>
+        </div>
+        <span class="tag">PAIRS · LONG ONLY</span>
+      </div>
+      <div class="controls">
+        <div class="ctrl-group" style="flex:1;min-width:200px">
+          <div class="ctrl-label">Tickers (comma separated)</div>
+          <input type="text" id="pt-tickers" value="ANTM,INCO,NCKL,ADRO,PTBA,MDKA" style="width:100%;max-width:380px"/>
+        </div>
+        <div class="ctrl-group"><div class="ctrl-label">Roll Window</div><input type="number" id="pt-window" value="60"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Z Entry</div><input type="number" id="pt-entry" value="2.0" step="0.1"/></div>
+        <div class="ctrl-group"><div class="ctrl-label">Min Corr</div><input type="number" id="pt-corr" value="0.7" step="0.05"/></div>
+        <button class="btn" onclick="runPairs()">RUN SCREEN</button>
+      </div>
+      <div id="pairs-result"></div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Navigation ──────────────────────────────────────────────────────────────
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(b => {
+    if (b.textContent.trim().toLowerCase().includes(id === 'overview' ? 'overview' :
+        id === 'vcb' ? 'volatility' : id === 'zscore' ? 'z-score' :
+        id === 'overnight' ? 'overnight' : id === 'ped' ? 'post' :
+        id === 'gap' ? 'gap' : id === 'rsi' ? 'rsi' : 'pairs')) {
+      b.classList.add('active');
+    }
+  });
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = (v, d=2) => v === null || v === undefined ? '—' : Number(v).toFixed(d);
+const color = v => v > 0 ? 'green' : v < 0 ? 'red' : 'white';
+
+function loading(el) {
+  el.innerHTML = `<div class="loading"><div class="spinner"></div>Fetching data from Yahoo Finance…</div>`;
+}
+
+function errBox(el, msg) {
+  el.innerHTML = `<div class="card" style="border-color:rgba(255,68,102,0.3)">
+    <div style="color:var(--red)">⚠ Error: ${msg}</div>
+    <div style="color:var(--muted);margin-top:6px;font-size:11px">Make sure the ticker is valid and ends without .JK (e.g. ANTM not ANTM.JK)</div>
+  </div>`;
+}
+
+function sparkline(data, color='#00d4ff', height=48) {
+  if (!data || data.length < 2) return '';
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const w = 300, h = height;
+  const pts = data.map((v,i) => `${(i/(data.length-1))*w},${h - ((v-min)/range)*h}`).join(' ');
+  const area = `${pts} ${w},${h} 0,${h}`;
+  const last = data[data.length-1];
+  const col = last >= data[0] ? '#00ff88' : '#ff4466';
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${col}" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <polygon points="${area}" fill="url(#sg)"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5"/>
+  </svg>`;
+}
+
+function statsGrid(s) {
+  if (!s || s.total_trades === 0) return `<div class="card"><div style="color:var(--muted)">No trades found with current parameters.</div></div>`;
+  const equityHtml = s.equity_curve ? `<div class="equity-spark">${sparkline(s.equity_curve)}</div>` : '';
+  return `
+  <div class="grid-4" style="margin-bottom:16px">
+    <div class="stat-box"><div class="stat-label">Total Trades</div><div class="stat-val white">${s.total_trades}</div></div>
+    <div class="stat-box"><div class="stat-label">Win Rate</div><div class="stat-val ${s.win_rate>=50?'green':'red'}">${fmt(s.win_rate,1)}%</div></div>
+    <div class="stat-box"><div class="stat-label">Avg Return</div><div class="stat-val ${color(s.avg_ret)}">${fmt(s.avg_ret,3)}%</div></div>
+    <div class="stat-box"><div class="stat-label">Payoff Ratio</div><div class="stat-val accent">${fmt(s.payoff,2)}</div></div>
+    <div class="stat-box"><div class="stat-label">Total PnL</div><div class="stat-val ${color(s.total_pnl)}">${fmt(s.total_pnl,2)}%</div></div>
+    <div class="stat-box"><div class="stat-label">Ann Return</div><div class="stat-val ${color(s.ann_ret)}">${fmt(s.ann_ret,1)}%</div></div>
+    <div class="stat-box"><div class="stat-label">Max Drawdown</div><div class="stat-val red">${fmt(s.max_dd,1)}%</div></div>
+    <div class="stat-box"><div class="stat-label">Avg Win / Loss</div>
+      <div class="stat-val white" style="font-size:13px">
+        <span style="color:var(--green)">${fmt(s.avg_win,2)}%</span>
+        <span style="color:var(--muted)"> / </span>
+        <span style="color:var(--red)">${fmt(s.avg_loss,2)}%</span>
+      </div>
+    </div>
+  </div>
+  ${s.equity_curve ? `<div class="card"><div class="card-title">Equity Curve</div>${equityHtml}</div>` : ''}`;
+}
+
+function tradesTable(trades) {
+  if (!trades || trades.length === 0) return '';
+  const rows = trades.slice().reverse().map(t => {
+    const pnl = t.pnl || 0;
+    const reason = t.reason || '';
+    return `<tr>
+      <td>${t.entry ? String(t.entry).slice(0,10) : '—'}</td>
+      <td>${t.exit  ? String(t.exit).slice(0,10)  : '—'}</td>
+      <td><span class="${pnl>0?'badge win':'badge loss'}">${pnl>0?'WIN':'LOSS'}</span></td>
+      <td style="color:${pnl>0?'var(--green)':'var(--red)'}">${fmt(pnl,3)}%</td>
+      <td><span class="badge ${reason==='STOP'?'stop':'time'}">${reason}</span></td>
+    </tr>`;
+  }).join('');
+  return `<div class="card"><div class="card-title">Recent Trades (last 20)</div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Entry</th><th>Exit</th><th>Result</th><th>PnL %</th><th>Reason</th></tr>
+      ${rows}
+    </table></div></div>`;
+}
+
+// ── 01 VCB ──────────────────────────────────────────────────────────────────
+async function runVCB() {
+  const el = $('vcb-result');
+  loading(el);
+  const p = new URLSearchParams({
+    ticker: $('vcb-ticker').value.trim(),
+    lookback: $('vcb-lookback').value,
+    percentile: $('vcb-percentile').value,
+    hold_days: $('vcb-hold').value,
+    stop_pct: $('vcb-stop').value,
+  });
+  try {
+    const r = await fetch(`/api/vcb?${p}`).then(r=>r.json());
+    if (!r.ok) { errBox(el, r.error); return; }
+    const sigClass = r.recent_signals.length ? 'bullish' : 'neutral';
+    const sigText  = r.recent_signals.length
+      ? `⚡ ${r.recent_signals.length} recent breakout signal(s) — last: ${r.recent_signals[r.recent_signals.length-1]}`
+      : '— No recent breakout signals detected';
+    el.innerHTML = `
+      <div class="signal-box ${sigClass}">${sigText}</div>
+      ${statsGrid(r.stats)}
+      <div class="card">
+        <div class="card-title">Compression Info</div>
+        <div style="color:var(--muted);font-size:12px">
+          Active compression zones identified: <span style="color:var(--yellow)">${r.compression_zones}</span> days in compression
+          <br/>Recent breakout signals: <span style="color:var(--accent)">${r.recent_signals.join(', ') || 'none'}</span>
+        </div>
+      </div>
+      ${tradesTable(r.trades)}`;
+  } catch(e) { errBox(el, e.message); }
+}
+
+// ── 02 Z-SCORE ───────────────────────────────────────────────────────────────
+async function runZScore() {
+  const el = $('zscore-result');
+  loading(el);
+  const p = new URLSearchParams({
+    tickerA: $('zs-tickerA').value.trim(),
+    tickerB: $('zs-tickerB').value.trim(),
+    roll_win: $('zs-window').value,
+    z_entry: $('zs-entry').value,
+    z_exit: $('zs-exit').value,
+    corr_min: $('zs-corr').value,
+  });
+  try {
+    const r = await fetch(`/api/zscore?${p}`).then(r=>r.json());
+    if (!r.ok) { errBox(el, r.error); return; }
+    const sigClass = r.signal.startsWith('LONG') ? 'bullish' : r.signal.startsWith('SHORT') ? 'bearish' : 'neutral';
+    // Z gauge: map z from -4..4 to 5%..95%
+    const zPct = Math.min(95, Math.max(5, ((r.current_z + 4) / 8) * 100));
+    const zColor = r.current_z <= -2 ? 'var(--green)' : r.current_z >= 2 ? 'var(--red)' : 'var(--accent)';
+    el.innerHTML = `
+      <div class="signal-box ${sigClass}">Current Signal: ${r.signal}</div>
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="stat-box"><div class="stat-label">Current Z-Score</div>
+          <div class="stat-val ${r.current_z<=-2?'green':r.current_z>=2?'red':'accent'}">${fmt(r.current_z,3)}</div>
+          <div class="z-gauge" style="margin-top:10px">
+            <div class="z-track"></div>
+            <div class="z-pointer" style="left:${zPct}%;background:${zColor};box-shadow:0 0 6px ${zColor}"></div>
+            <div class="z-label-n2">-2σ</div><div class="z-label-0">0</div><div class="z-label-p2">+2σ</div>
+          </div>
+        </div>
+        <div class="stat-box"><div class="stat-label">Rolling Correlation</div>
+          <div class="stat-val ${r.current_corr>=0.7?'green':r.current_corr>=0.4?'yellow':'red'}">${fmt(r.current_corr,3)}</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--muted)">
+            ${r.current_corr>=0.7?'✅ High correlation — pair valid':'⚠ Low correlation — pair unreliable'}
+          </div>
+        </div>
+      </div>
+      ${statsGrid(r.stats)}
+      ${tradesTable(r.trades)}`;
+  } catch(e) { errBox(el, e.message); }
+}
+
+// ── 03 OVERNIGHT ─────────────────────────────────────────────────────────────
+async function runOvernight() {
+  const el = $('overnight-result');
+  loading(el);
+  const p = new URLSearchParams({ ticker: $('on-ticker').value.trim(), ma_period: $('on-ma').value });
+  try {
+    const r = await fetch(`/api/overnight?${p}`).then(r=>r.json());
+    if (!r.ok) { errBox(el, r.error); return; }
+    const sigClass = r.signal.startsWith('✅') ? 'bullish' : 'neutral';
+    const ro = r.raw_overnight, fo = r.filtered_overnight, id = r.intraday;
+
+    const dowBars = Object.entries(r.dow_avg).map(([day,val]) => {
+      const absMax = Math.max(...Object.values(r.dow_avg).map(Math.abs), 0.01);
+      const pct = Math.min(100, (Math.abs(val) / absMax) * 100);
+      const col = val >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<div class="dow-row">
+        <div class="dow-day">${day}</div>
+        <div class="dow-bar-bg"><div class="dow-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="dow-val" style="color:${col}">${fmt(val,4)}%</div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="signal-box ${sigClass}">${r.signal}</div>
+      <div class="grid-3" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-title">Raw Overnight (after fees)</div>
+          <div class="grid-2" style="gap:10px">
+            <div class="stat-box"><div class="stat-label">Win Rate</div><div class="stat-val ${ro.win_rate>=50?'green':'red'}">${fmt(ro.win_rate,1)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Ann Return</div><div class="stat-val ${color(ro.ann_ret)}">${fmt(ro.ann_ret,1)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Avg Ret/day</div><div class="stat-val accent">${fmt(ro.avg_ret,4)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Max DD</div><div class="stat-val red">${fmt(ro.max_dd,1)}%</div></div>
+          </div>
+        </div>
+        <div class="card" style="border-color:rgba(0,255,136,0.2)">
+          <div class="card-title" style="color:var(--green)">Filtered Overnight ✦</div>
+          <div class="grid-2" style="gap:10px">
+            <div class="stat-box"><div class="stat-label">Win Rate</div><div class="stat-val ${fo.win_rate>=50?'green':'red'}">${fmt(fo.win_rate,1)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Ann Return</div><div class="stat-val ${color(fo.ann_ret)}">${fmt(fo.ann_ret,1)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Avg Ret/day</div><div class="stat-val accent">${fmt(fo.avg_ret,4)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Max DD</div><div class="stat-val red">${fmt(fo.max_dd,1)}%</div></div>
+          </div>
+        </div>
+        <div class="card" style="border-color:rgba(255,68,102,0.2)">
+          <div class="card-title" style="color:var(--red)">Intraday (buy open → sell close)</div>
+          <div class="grid-2" style="gap:10px">
+            <div class="stat-box"><div class="stat-label">Win Rate</div><div class="stat-val ${id.win_rate>=50?'green':'red'}">${fmt(id.win_rate,1)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Ann Return</div><div class="stat-val ${color(id.ann_ret)}">${fmt(id.ann_ret,1)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Avg Ret/day</div><div class="stat-val accent">${fmt(id.avg_ret,4)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Max DD</div><div class="stat-val red">${fmt(id.max_dd,1)}%</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Average Overnight Return by Weekday</div>
+        <div class="dow-bar-wrap">${dowBars}</div>
+      </div>`;
+  } catch(e) { errBox(el, e.message); }
+}
+
+// ── 04 PED ───────────────────────────────────────────────────────────────────
+async function runPED() {
+  const el = $('ped-result');
+  loading(el);
+  const p = new URLSearchParams({
+    ticker: $('ped-ticker').value.trim(),
+    gap_threshold: $('ped-gap').value,
+    hold_days: $('ped-hold').value,
+    stop_pct: $('ped-stop').value,
+    vol_ratio_min: $('ped-vol').value,
+  });
+  try {
+    const r = await fetch(`/api/ped?${p}`).then(r=>r.json());
+    if (!r.ok) { errBox(el, r.error); return; }
+    const recent = r.recent_events.map(e =>
+      `<tr><td>${e.date}</td><td style="color:var(--green)">+${fmt(e.gap,2)}%</td><td style="color:var(--accent)">${fmt(e.vol_ratio,2)}x</td></tr>`
+    ).join('');
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">Event Detection</div>
+        <div style="font-size:12px;color:var(--muted)">Total events detected since 2018: <span style="color:var(--yellow)">${r.total_events}</span></div>
+      </div>
+      ${statsGrid(r.stats)}
+      <div class="card">
+        <div class="card-title">Most Recent Gap-Up Events</div>
+        <div class="tbl-wrap"><table>
+          <tr><th>Date</th><th>Gap %</th><th>Volume Ratio</th></tr>
+          ${recent || '<tr><td colspan="3" style="color:var(--muted)">No recent events found</td></tr>'}
+        </table></div>
+      </div>
+      ${tradesTable(r.trades)}`;
+  } catch(e) { errBox(el, e.message); }
+}
+
+// ── 05 GAP ───────────────────────────────────────────────────────────────────
+async function runGap() {
+  const el = $('gap-result');
+  loading(el);
+  const p = new URLSearchParams({
+    ticker: $('gap-ticker').value.trim(),
+    gap_min: $('gap-min').value,
+    vol_mult: $('gap-vol').value,
+  });
+  try {
+    const r = await fetch(`/api/gap_continuation?${p}`).then(r=>r.json());
+    if (!r.ok) { errBox(el, r.error); return; }
+    const sigClass = r.signal.startsWith('✅') ? 'bullish' : 'neutral';
+    const g = r.gap_days, a = r.all_days;
+    const recent = r.recent_signals.map(s =>
+      `<tr><td>${s.date}</td>
+       <td style="color:var(--green)">+${fmt(s.gap,2)}%</td>
+       <td style="color:var(--accent)">${fmt(s.vol_ratio,2)}x</td>
+       <td style="color:${s.intraday_ret>=0?'var(--green)':'var(--red)'}">${fmt(s.intraday_ret,2)}%</td></tr>`
+    ).join('');
+    el.innerHTML = `
+      <div class="signal-box ${sigClass}">${r.signal}</div>
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="card" style="border-color:rgba(0,255,136,0.2)">
+          <div class="card-title" style="color:var(--green)">Gap Days Only (filtered)</div>
+          <div class="grid-2" style="gap:10px">
+            <div class="stat-box"><div class="stat-label">Count</div><div class="stat-val white">${g.count||0}</div></div>
+            <div class="stat-box"><div class="stat-label">Win Rate</div><div class="stat-val ${(g.win_rate||0)>=50?'green':'red'}">${fmt(g.win_rate,1)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Avg Return</div><div class="stat-val ${color(g.avg_ret)}">${fmt(g.avg_ret,3)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Total PnL</div><div class="stat-val ${color(g.total_pnl)}">${fmt(g.total_pnl,2)}%</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">All Days (benchmark)</div>
+          <div class="grid-2" style="gap:10px">
+            <div class="stat-box"><div class="stat-label">Count</div><div class="stat-val white">${a.count||0}</div></div>
+            <div class="stat-box"><div class="stat-label">Win Rate</div><div class="stat-val ${(a.win_rate||0)>=50?'green':'red'}">${fmt(a.win_rate,1)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Avg Return</div><div class="stat-val ${color(a.avg_ret)}">${fmt(a.avg_ret,3)}%</div></div>
+            <div class="stat-box"><div class="stat-label">Total PnL</div><div class="stat-val ${color(a.total_pnl)}">${fmt(a.total_pnl,2)}%</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Recent Gap-Up Signals</div>
+        <div class="tbl-wrap"><table>
+          <tr><th>Date</th><th>Gap %</th><th>Vol Ratio</th><th>Intraday Ret</th></tr>
+          ${recent || '<tr><td colspan="4" style="color:var(--muted)">No recent signals found</td></tr>'}
+        </table></div>
+      </div>`;
+  } catch(e) { errBox(el, e.message); }
+}
+
+// ── 06 RSI ROTATION ──────────────────────────────────────────────────────────
+async function runRSI() {
+  const el = $('rsi-result');
+  loading(el);
+  const p = new URLSearchParams({
+    tickers: $('rsi-tickers').value.trim(),
+    mom_window: $('rsi-mom').value,
+    top_pct: $('rsi-top').value,
+  });
+  try {
+    const r = await fetch(`/api/rsi_rotation?${p}`).then(r=>r.json());
+    if (!r.ok) { errBox(el, r.error); return; }
+
+    const maxScore = Math.max(...r.rankings.map(x => Math.abs(x.score)));
+    const rankRows = r.rankings.map(rk => {
+      const barPct = Math.min(100, (Math.abs(rk.score) / maxScore) * 100);
+      const barCol = rk.selected ? 'var(--green)' : 'var(--muted)';
+      return `<div class="rank-row">
+        <div class="rank-num">#${rk.rank}</div>
+        <div class="rank-ticker" style="color:${rk.selected?'var(--green)':'var(--text)'}">${rk.ticker}</div>
+        <div class="rank-bar-wrap"><div class="rank-bar" style="width:${barPct}%;background:${barCol}"></div></div>
+        <div class="rank-score" style="color:${rk.momentum>=0?'var(--green)':'var(--red)'}">${fmt(rk.momentum,1)}%</div>
+        <div style="min-width:50px;text-align:right;font-size:11px;color:var(--muted)">RSI ${fmt(rk.rsi,0)}</div>
+        ${rk.selected ? '<span class="selected-badge" style="margin-left:8px">HOLD</span>' : '<span style="width:50px;display:inline-block"></span>'}
+      </div>`;
+    }).join('');
+
+    const alpha = r.port_ann_ret - r.bench_ann_ret;
+    el.innerHTML = `
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="stat-box"><div class="stat-label">Momentum Ann Return</div><div class="stat-val ${color(r.port_ann_ret)}">${fmt(r.port_ann_ret,1)}%</div></div>
+        <div class="stat-box"><div class="stat-label">Benchmark Ann Return</div><div class="stat-val ${color(r.bench_ann_ret)}">${fmt(r.bench_ann_ret,1)}%</div></div>
+        <div class="stat-box"><div class="stat-label">Alpha vs Benchmark</div><div class="stat-val ${color(alpha)}">${fmt(alpha,1)}%</div></div>
+        <div class="stat-box"><div class="stat-label">Top Picks This Month</div>
+          <div style="color:var(--green);font-size:13px;font-weight:700;margin-top:4px">${r.top_picks.join(', ')}</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Current Rankings by Momentum Score</div>
+          ${rankRows}
+        </div>
+        <div class="card">
+          <div class="card-title">Equity Curves</div>
+          <div style="margin-bottom:6px;font-size:11px"><span style="color:var(--green)">── Momentum</span>  <span style="color:var(--muted)">- - Benchmark</span></div>
+          <div style="height:120px;position:relative">${sparkline(r.port_equity)}</div>
+          <div style="height:80px;position:relative;margin-top:4px;opacity:0.5">${sparkline(r.bench_equity,'#888888')}</div>
+        </div>
+      </div>`;
+  } catch(e) { errBox(el, e.message); }
+}
+
+// ── 07 PAIRS ─────────────────────────────────────────────────────────────────
+async function runPairs() {
+  const el = $('pairs-result');
+  loading(el);
+  const p = new URLSearchParams({
+    tickers: $('pt-tickers').value.trim(),
+    roll_win: $('pt-window').value,
+    z_entry: $('pt-entry').value,
+    corr_min: $('pt-corr').value,
+  });
+  try {
+    const r = await fetch(`/api/pairs?${p}`).then(r=>r.json());
+    if (!r.ok) { errBox(el, r.error); return; }
+
+    const liveSignals = r.pairs.filter(p => p.live_signal);
+
+    const pairRows = r.pairs.map(p => {
+      const s = p.stats;
+      const sigBadge = p.live_signal
+        ? `<span class="badge signal">BUY ${p.tickerA}</span>`
+        : `<span class="badge nosig">—</span>`;
+      const corrColor = p.current_corr >= 0.7 ? 'var(--green)' : p.current_corr >= 0.4 ? 'var(--yellow)' : 'var(--red)';
+      const zColor = Math.abs(p.current_z) >= 2 ? 'var(--yellow)' : 'var(--muted)';
+      return `<tr>
+        <td style="font-weight:700">${p.pair}</td>
+        <td>${sigBadge}</td>
+        <td style="color:${zColor}">${fmt(p.current_z,2)}</td>
+        <td style="color:${corrColor}">${fmt(p.current_corr,2)}</td>
+        <td>${s.total_trades||0}</td>
+        <td style="color:${(s.win_rate||0)>=50?'var(--green)':'var(--red)'}">${fmt(s.win_rate,1)}%</td>
+        <td>${fmt(s.payoff,2)}</td>
+        <td style="color:${color(s.total_pnl)}">${fmt(s.total_pnl,2)}%</td>
+      </tr>`;
+    }).join('');
+
+    // Correlation matrix
+    const cm = r.corr_matrix;
+    const cellSize = 44;
+    const corrCells = cm.tickers.map((tA,i) =>
+      `<tr>
+        <td style="color:var(--muted);font-size:11px;padding:4px 8px">${tA.replace('.JK','')}</td>
+        ${cm.matrix[i].map((val,j) => {
+          const bg = val > 0.7 ? `rgba(0,255,136,${(val-0.7)*2.5*0.4})` :
+                     val > 0.4 ? `rgba(255,214,0,${(val-0.4)*1.5*0.3})` :
+                     val < 0   ? `rgba(255,68,102,${Math.abs(val)*0.3})` : 'transparent';
+          const fg = i===j ? 'var(--muted)' : Math.abs(val) > 0.5 ? 'white' : 'var(--text)';
+          return `<td style="background:${bg};color:${fg};text-align:center;font-size:10px;padding:4px;border-radius:2px">${fmt(val,2)}</td>`;
+        }).join('')}
+      </tr>`
+    ).join('');
+
+    const liveHtml = liveSignals.length
+      ? `<div class="signal-box bullish">⚡ ${liveSignals.length} live signal(s): ${liveSignals.map(p=>'BUY '+p.tickerA+' ('+p.pair+')').join('  ·  ')}</div>`
+      : `<div class="signal-box neutral">— No pairs currently at extreme z-score</div>`;
+
+    el.innerHTML = `
+      ${liveHtml}
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">All Pairs — Ranked by Total PnL</div>
+        <div class="tbl-wrap"><table>
+          <tr><th>Pair</th><th>Signal</th><th>Current Z</th><th>Corr</th><th>Trades</th><th>Win%</th><th>Payoff</th><th>Total PnL%</th></tr>
+          ${pairRows}
+        </table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Correlation Matrix</div>
+        <div class="tbl-wrap"><table style="font-size:11px">
+          <tr><th></th>${cm.tickers.map(t=>`<th style="font-size:10px">${t.replace('.JK','')}</th>`).join('')}</tr>
+          ${corrCells}
+        </table></div>
+      </div>`;
+  } catch(e) { errBox(el, e.message); }
+}
+</script>
+</body>
+</html>
